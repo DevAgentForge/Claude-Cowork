@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/8ce58c8b-4024-4c01-82ee-f8d8ed6d4bba
 
 ---
 
-## ✨ Why Agent Cowork?
+## ✨ Why Claude Cowork?
 
 Claude Code is powerful — but it **only runs in the terminal**.
 
