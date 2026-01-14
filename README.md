@@ -116,24 +116,49 @@ Agent Cowork is your AI partner that can:
 
 ---
 
-## 🔁 Fully Compatible with Claude Code
+## 🔁 完全兼容 Claude Code
 
-Agent Cowork **shares configuration with Claude Code**.
+Claude Cowork **与 Claude Code 共享配置**，同时支持 **MiniMax 大模型**。
 
-It directly reuses:
+它直接复用：
 
-text
+```
 ~/.claude/settings.json
+```
 
+这意味着：
 
-This means:
+- 相同的 API 密钥
+- 相同的 Base URL
+- 相同的模型配置
+- 相同的行为表现
 
-* Same API keys
-* Same base URL
-* Same models
-* Same behavior
+### MiniMax 支持
 
-> Configure Claude Code once — use it everywhere.
+| 配置项 | 说明 |
+|--------|------|
+| API Key | MiniMax API 密钥 |
+| Base URL | API 端点地址 |
+| Model | 使用的模型名称 |
+
+#### 环境变量配置
+
+```bash
+# MiniMax 配置
+MINIMAX_API_KEY=your_api_key
+MINIMAX_BASE_URL=https://api.minimax.chat/v1
+MINIMAX_MODEL=abab6.5s-chat
+```
+
+### 图形化配置
+
+点击侧边栏的 **齿轮图标** (⚙️) 打开设置界面，你可以：
+
+- 配置 MiniMax 的 API 密钥、Base URL 和模型
+- 一键切换不同配置
+- 保存常用设置
+
+> 配置一次，随时使用。
 
 ---
 
@@ -162,12 +187,13 @@ bun run build
 
 ---
 
-## 🗺 Roadmap
+## 🗺 路线图
 
-Planned features:
+计划中的功能：
 
-* GUI-based configuration for models and API keys
-* 🚧 More features coming soon
+- ✅ 图形化配置模型和 API 密钥
+- ✅ MiniMax 大模型支持
+- 🚧 更多功能即将推出
 
 ---
 
