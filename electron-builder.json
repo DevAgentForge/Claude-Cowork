@@ -8,10 +8,12 @@
     "extraResources": [
         "dist-electron/preload.cjs"
     ],
+    "asarUnpack": [
+        "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
+    ],
     "icon": "./claude-color.png",
     "mac": {
-        "target": "dmg",
-        "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk/vendor/**/*"
+        "target": "dmg"
     },
     "linux": {
         "target": "AppImage",
