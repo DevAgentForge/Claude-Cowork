@@ -1,6 +1,27 @@
-[English](README.md)
 
-# Claude Cowork
+<div align="center">
+
+# Open Claude Cowork
+
+[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
+[![Platform](https://img.shields.io/badge/platform-%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
+
+[英文](README.md)
+
+</div>
+
+## ❤️ 合作
+
+[![MiniMax](assets/partners/minimax_banner.jpg)](https://platform.minimaxi.com/subscribe/coding-plan?code=6uFnRx7O0W&source=link)
+
+MiniMax-M2.1 是一款开源的 SOTA（当前最先进）模型，在编程能力、数字环境操作以及处理长流程、多步骤任务方面表现出色。
+通过 开源的 Claude Cowork 替代方案，M2.1 朝着我们“通用生产力 AI”的长期愿景迈出了坚实一步，让先进的 AI 能力真正触达每一个人。
+
+[点击](https://platform.minimaxi.com/subscribe/coding-plan?code=6uFnRx7O0W&source=link)即可享受 MiniMax 编程计划专属 12% 折扣
+
+---
+
+## 关于
 
 一个**桌面 AI 助手**，帮助你完成**编程、文件管理以及任何你能描述的任务**，  
 

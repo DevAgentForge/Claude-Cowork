@@ -1,11 +1,11 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron"
-import { ipcMainHandle, isDev } from "./util.js";
+import { ipcMainHandle, isDev, DEV_PORT } from "./util.js";
 import { getPreloadPath, getUIPath, getIconPath } from "./pathResolver.js";
 import { getStaticData, pollResources } from "./test.js";
 import { handleClientEvent, sessions } from "./ipc-handlers.js";
 import { generateSessionTitle } from "./libs/util.js";
 import type { ClientEvent } from "./types.js";
-const PORT = 10087;
+import "./libs/claude-settings.js";
 
 app.on("ready", () => {
     const mainWindow = new BrowserWindow({
@@ -22,7 +22,7 @@ app.on("ready", () => {
         trafficLightPosition: { x: 15, y: 18 }
     });
 
-    if (isDev()) mainWindow.loadURL(`http://localhost:${PORT}`)
+    if (isDev()) mainWindow.loadURL(`http://localhost:${DEV_PORT}`)
     else mainWindow.loadFile(getUIPath());
 
     pollResources(mainWindow);

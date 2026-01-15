@@ -2,6 +2,7 @@ import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/cla
 import type { ServerEvent } from "../types.js";
 import type { Session } from "./session-store.js";
 import type { PermissionMode } from "../types.js";
+import { claudeCodePath, enhancedEnv } from "./util.js";
 
 export type RunnerOptions = {
   prompt: string;
@@ -117,7 +118,9 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           cwd: session.cwd ?? DEFAULT_CWD,
           resume: resumeSessionId,
           abortController,
-          env: { ...process.env },
+          env: enhancedEnv,
+          pathToClaudeCodeExecutable: claudeCodePath,
+          permissionMode: "bypassPermissions",
           includePartialMessages: true,
           ...(permissionMode === "free"
             ? { permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true }
