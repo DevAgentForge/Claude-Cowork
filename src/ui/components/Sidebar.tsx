@@ -7,18 +7,25 @@ interface SidebarProps {
   connected: boolean;
   onNewSession: () => void;
   onDeleteSession: (sessionId: string) => void;
+  onOpenProviderSettings: () => void;
 }
 
 export function Sidebar({
   onNewSession,
-  onDeleteSession
+  onDeleteSession,
+  onOpenProviderSettings
 }: SidebarProps) {
   const sessions = useAppStore((state) => state.sessions);
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const setActiveSessionId = useAppStore((state) => state.setActiveSessionId);
+  const providers = useAppStore((state) => state.providers);
+  const selectedProviderId = useAppStore((state) => state.selectedProviderId);
+  const setSelectedProviderId = useAppStore((state) => state.setSelectedProviderId);
   const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
+
+  const selectedProvider = providers.find((p) => p.id === selectedProviderId);
 
   const formatCwd = (cwd?: string) => {
     if (!cwd) return "Working dir unavailable";
@@ -79,6 +86,37 @@ export function Sidebar({
       >
         + New Task
       </button>
+
+      {/* Provider Selector */}
+      <div className="rounded-xl border border-ink-900/10 bg-surface p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Provider</span>
+          <button
+            className="text-xs text-accent hover:text-accent-hover transition-colors"
+            onClick={onOpenProviderSettings}
+          >
+            Configure
+          </button>
+        </div>
+        <select
+          className="w-full rounded-lg border border-ink-900/10 bg-surface-secondary px-3 py-2 text-sm text-ink-700 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20"
+          value={selectedProviderId || ""}
+          onChange={(e) => setSelectedProviderId(e.target.value || null)}
+        >
+          <option value="">Default (Claude Code)</option>
+          {providers.map((provider) => (
+            <option key={provider.id} value={provider.id}>
+              {provider.name}
+            </option>
+          ))}
+        </select>
+        {selectedProvider && (
+          <div className="mt-2 text-[10px] text-muted truncate">
+            {selectedProvider.baseUrl}
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-col gap-2 overflow-y-auto">
         {sessionList.length === 0 && (
           <div className="rounded-xl border border-ink-900/5 bg-surface px-4 py-5 text-center text-xs text-muted">

@@ -2,6 +2,7 @@ import { BrowserWindow } from "electron";
 import type { ClientEvent, ServerEvent } from "./types.js";
 import { runClaude, type RunnerHandle } from "./libs/runner.js";
 import { SessionStore } from "./libs/session-store.js";
+import { loadProviders, saveProvider, deleteProvider, getProvider } from "./libs/provider-config.js";
 import { app } from "electron";
 import { join } from "path";
 
@@ -70,6 +71,9 @@ export function handleClientEvent(event: ClientEvent) {
       prompt: event.payload.prompt
     });
 
+    // Get provider configuration if providerId is provided
+    const provider = event.payload.providerId ? getProvider(event.payload.providerId) : null;
+
     sessions.updateSession(session.id, {
       status: "running",
       lastPrompt: event.payload.prompt
@@ -91,7 +95,8 @@ export function handleClientEvent(event: ClientEvent) {
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
-      }
+      },
+      provider
     })
       .then((handle) => {
         runnerHandles.set(session.id, handle);
@@ -132,6 +137,9 @@ export function handleClientEvent(event: ClientEvent) {
       return;
     }
 
+    // Get provider configuration if providerId is provided
+    const provider = event.payload.providerId ? getProvider(event.payload.providerId) : null;
+
     sessions.updateSession(session.id, { status: "running", lastPrompt: event.payload.prompt });
     emit({
       type: "session.status",
@@ -150,7 +158,8 @@ export function handleClientEvent(event: ClientEvent) {
       onEvent: emit,
       onSessionUpdate: (updates) => {
         sessions.updateSession(session.id, updates);
-      }
+      },
+      provider
     })
       .then((handle) => {
         runnerHandles.set(session.id, handle);
@@ -215,6 +224,47 @@ export function handleClientEvent(event: ClientEvent) {
     const pending = session.pendingPermissions.get(event.payload.toolUseId);
     if (pending) {
       pending.resolve(event.payload.result);
+    }
+    return;
+  }
+
+  // Provider configuration handlers
+  if (event.type === "provider.list") {
+    const providers = loadProviders();
+    emit({
+      type: "provider.list",
+      payload: { providers }
+    });
+    return;
+  }
+
+  if (event.type === "provider.save") {
+    const savedProvider = saveProvider(event.payload.provider);
+    emit({
+      type: "provider.saved",
+      payload: { provider: savedProvider }
+    });
+    return;
+  }
+
+  if (event.type === "provider.delete") {
+    const deleted = deleteProvider(event.payload.providerId);
+    if (deleted) {
+      emit({
+        type: "provider.deleted",
+        payload: { providerId: event.payload.providerId }
+      });
+    }
+    return;
+  }
+
+  if (event.type === "provider.get") {
+    const provider = getProvider(event.payload.providerId);
+    if (provider) {
+      emit({
+        type: "provider.data",
+        payload: { provider }
+      });
     }
     return;
   }

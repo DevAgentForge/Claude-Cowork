@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ServerEvent, SessionStatus, StreamMessage } from "../types";
+import type { ServerEvent, SessionStatus, StreamMessage, LlmProviderConfig } from "../types";
 
 export type PermissionRequest = {
   toolUseId: string;
@@ -30,15 +30,23 @@ interface AppState {
   sessionsLoaded: boolean;
   showStartModal: boolean;
   historyRequested: Set<string>;
+  providers: LlmProviderConfig[];
+  selectedProviderId: string | null;
+  showProviderModal: boolean;
 
   setPrompt: (prompt: string) => void;
   setCwd: (cwd: string) => void;
   setPendingStart: (pending: boolean) => void;
   setGlobalError: (error: string | null) => void;
   setShowStartModal: (show: boolean) => void;
+  setShowProviderModal: (show: boolean) => void;
   setActiveSessionId: (id: string | null) => void;
+  setSelectedProviderId: (id: string | null) => void;
   markHistoryRequested: (sessionId: string) => void;
   resolvePermissionRequest: (sessionId: string, toolUseId: string) => void;
+  setProviders: (providers: LlmProviderConfig[]) => void;
+  addOrUpdateProvider: (provider: LlmProviderConfig) => void;
+  removeProvider: (providerId: string) => void;
   handleServerEvent: (event: ServerEvent) => void;
 }
 
@@ -56,13 +64,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionsLoaded: false,
   showStartModal: false,
   historyRequested: new Set(),
+  providers: [],
+  selectedProviderId: null,
+  showProviderModal: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setCwd: (cwd) => set({ cwd }),
   setPendingStart: (pendingStart) => set({ pendingStart }),
   setGlobalError: (globalError) => set({ globalError }),
   setShowStartModal: (showStartModal) => set({ showStartModal }),
+  setShowProviderModal: (showProviderModal) => set({ showProviderModal }),
   setActiveSessionId: (id) => set({ activeSessionId: id }),
+  setSelectedProviderId: (selectedProviderId) => set({ selectedProviderId }),
 
   markHistoryRequested: (sessionId) => {
     set((state) => {
@@ -246,6 +259,59 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ globalError: event.payload.message });
         break;
       }
+
+      case "provider.list": {
+        set({ providers: event.payload.providers });
+        break;
+      }
+
+      case "provider.saved": {
+        const savedProvider = event.payload.provider;
+        set((state) => {
+          const existingIndex = state.providers.findIndex((p) => p.id === savedProvider.id);
+          if (existingIndex >= 0) {
+            const newProviders = [...state.providers];
+            newProviders[existingIndex] = savedProvider;
+            return { providers: newProviders };
+          }
+          return { providers: [...state.providers, savedProvider] };
+        });
+        break;
+      }
+
+      case "provider.deleted": {
+        set((state) => ({
+          providers: state.providers.filter((p) => p.id !== event.payload.providerId),
+          selectedProviderId: state.selectedProviderId === event.payload.providerId ? null : state.selectedProviderId
+        }));
+        break;
+      }
+
+      case "provider.data": {
+        // Handle single provider fetch if needed
+        break;
+      }
     }
+  },
+
+  setProviders: (providers) => set({ providers }),
+
+  addOrUpdateProvider: (provider) => {
+    set((state) => {
+      const existingIndex = state.providers.findIndex((p) => p.id === provider.id);
+      if (existingIndex >= 0) {
+        const newProviders = [...state.providers];
+        newProviders[existingIndex] = provider;
+        return { providers: newProviders };
+      }
+      return { providers: [...state.providers, provider] };
+    });
+  },
+
+  removeProvider: (providerId) => {
+    set((state) => ({
+      providers: state.providers.filter((p) => p.id !== providerId),
+      selectedProviderId: state.selectedProviderId === providerId ? null : state.selectedProviderId
+    }));
   }
 }));

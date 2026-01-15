@@ -1,6 +1,8 @@
 import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import type { ServerEvent } from "../types.js";
 import type { Session } from "./session-store.js";
+import type { LlmProviderConfig } from "../types.js";
+import { getProviderEnv } from "./provider-config.js";
 
 export type RunnerOptions = {
   prompt: string;
@@ -8,6 +10,7 @@ export type RunnerOptions = {
   resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
+  provider?: LlmProviderConfig | null;
 };
 
 export type RunnerHandle = {
@@ -17,8 +20,12 @@ export type RunnerHandle = {
 const DEFAULT_CWD = process.cwd();
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
-  const { prompt, session, resumeSessionId, onEvent, onSessionUpdate } = options;
+  const { prompt, session, resumeSessionId, onEvent, onSessionUpdate, provider } = options;
   const abortController = new AbortController();
+
+  // Get custom environment variables from provider config, if provided
+  const customEnv = provider ? getProviderEnv(provider) : {};
+
 
   const sendMessage = (message: SDKMessage) => {
     onEvent({
@@ -43,7 +50,8 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           cwd: session.cwd ?? DEFAULT_CWD,
           resume: resumeSessionId,
           abortController,
-          env: { ...process.env },
+          // Merge process.env with custom provider env (custom overrides process.env)
+          env: { ...process.env, ...customEnv },
           permissionMode: "bypassPermissions",
           includePartialMessages: true,
           allowDangerouslySkipPermissions: true,
