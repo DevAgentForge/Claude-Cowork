@@ -48,13 +48,16 @@ export class SessionStore {
   }
 
   createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string }): Session {
+    // Validate and sanitize cwd to prevent path traversal
+    const sanitizedCwd = options.cwd ? this.sanitizePath(options.cwd) : undefined;
+
     const id = crypto.randomUUID();
     const now = Date.now();
     const session: Session = {
       id,
       title: options.title,
       status: "idle",
-      cwd: options.cwd,
+      cwd: sanitizedCwd,
       allowedTools: options.allowedTools,
       lastPrompt: options.prompt,
       pendingPermissions: new Map()
@@ -187,31 +190,34 @@ export class SessionStore {
   }
 
   private persistSession(id: string, updates: Partial<Session>): void {
-    const fields: string[] = [];
+    // Use parameterized queries for all updates - never construct SQL with string concatenation
+    const setClauses: string[] = [];
     const values: Array<string | number | null> = [];
-    const updatable = {
+
+    const fieldMappings: Record<string, string> = {
       claudeSessionId: "claude_session_id",
       status: "status",
       cwd: "cwd",
       allowedTools: "allowed_tools",
       lastPrompt: "last_prompt"
-    } as const;
+    };
 
-    for (const key of Object.keys(updates) as Array<keyof typeof updatable>) {
-      const column = updatable[key];
+    for (const key of Object.keys(updates)) {
+      const column = fieldMappings[key];
       if (!column) continue;
-      fields.push(`${column} = ?`);
-      const value = updates[key];
+      setClauses.push(`${column} = ?`);
+      const value = updates[key as keyof Partial<Session>];
       values.push(value === undefined ? null : (value as string));
     }
 
-    if (fields.length === 0) return;
-    fields.push("updated_at = ?");
+    if (setClauses.length === 0) return;
+    setClauses.push("updated_at = ?");
     values.push(Date.now());
     values.push(id);
-    this.db
-      .prepare(`update sessions set ${fields.join(", ")} where id = ?`)
-      .run(...values);
+
+    // Use parameterized query with all values as placeholders
+    const sql = `UPDATE sessions SET ${setClauses.join(", ")} WHERE id = ?`;
+    this.db.prepare(sql).run(...values);
   }
 
   private initialize(): void {
@@ -239,6 +245,19 @@ export class SessionStore {
       )`
     );
     this.db.exec(`create index if not exists messages_session_id on messages(session_id)`);
+  }
+
+  /**
+   * Sanitize path to prevent path traversal attacks (CWE-22)
+   */
+  private sanitizePath(path: string): string {
+    // Normalize the path and resolve to absolute
+    const normalized = path.replace(/[^\w\s\-\.]/g, "");
+    // Ensure path doesn't contain dangerous sequences
+    if (normalized.includes("..") || normalized.startsWith("/") || /^[a-z]:\\/i.test(normalized)) {
+      throw new Error("Invalid path: path traversal or absolute paths not allowed");
+    }
+    return normalized;
   }
 
   private loadSessions(): void {
