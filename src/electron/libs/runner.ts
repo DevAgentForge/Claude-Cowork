@@ -1,8 +1,7 @@
 import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
-import type { ServerEvent } from "../types.js";
+import type { ServerEvent, LlmProviderConfig, PermissionMode } from "../types.js";
 import type { Session } from "./session-store.js";
 import { claudeCodePath, enhancedEnv } from "./util.js";
-import type { LlmProviderConfig } from "../types.js";
 import { getProviderEnv } from "./provider-config.js";
 
 export type RunnerOptions = {
@@ -20,14 +19,110 @@ export type RunnerHandle = {
 
 const DEFAULT_CWD = process.cwd();
 
+/**
+ * Parse comma-separated list of allowed tools into a Set
+ * Returns null if no restrictions (all tools allowed)
+ */
+export function parseAllowedTools(allowedTools?: string): Set<string> | null {
+  if (allowedTools === undefined || allowedTools === null || allowedTools.trim() === "") {
+    return null;
+  }
+  const items = allowedTools
+    .split(",")
+    .map((tool) => tool.trim())
+    .filter(Boolean)
+    .map((tool) => tool.toLowerCase());
+  return new Set(items);
+}
+
+/**
+ * Check if a tool is allowed based on allowedTools configuration
+ * AskUserQuestion is always allowed
+ */
+export function isToolAllowed(toolName: string, allowedTools: Set<string> | null): boolean {
+  // AskUserQuestion is always allowed
+  if (toolName === "AskUserQuestion") return true;
+  // If no restrictions, all tools are allowed
+  if (!allowedTools) return true;
+  // Check if tool is in the allowed set
+  return allowedTools.has(toolName.toLowerCase());
+}
+
+type PermissionRequestContext = {
+  session: Session;
+  sendPermissionRequest: (toolUseId: string, toolName: string, input: unknown) => void;
+  permissionMode: PermissionMode;
+  allowedTools: Set<string> | null;
+};
+
+/**
+ * Create a canUseTool function based on permission mode and allowed tools
+ * - "free" mode: auto-approve all tools except AskUserQuestion
+ * - "secure" mode: require user approval for all tools
+ */
+export function createCanUseTool({
+  session,
+  sendPermissionRequest,
+  permissionMode,
+  allowedTools
+}: PermissionRequestContext) {
+  return async (toolName: string, input: unknown, { signal }: { signal: AbortSignal }) => {
+    const isAskUserQuestion = toolName === "AskUserQuestion";
+
+    // FREE mode: auto-approve all tools except AskUserQuestion
+    if (!isAskUserQuestion && permissionMode === "free") {
+      // Still check allowedTools even in free mode
+      if (!isToolAllowed(toolName, allowedTools)) {
+        return {
+          behavior: "deny",
+          message: `Tool ${toolName} is not allowed by allowedTools restriction`
+        } as PermissionResult;
+      }
+      return { behavior: "allow", updatedInput: input } as PermissionResult;
+    }
+
+    // SECURE mode: check allowedTools and require user approval
+    if (!isToolAllowed(toolName, allowedTools)) {
+      return {
+        behavior: "deny",
+        message: `Tool ${toolName} is not allowed by allowedTools restriction`
+      } as PermissionResult;
+    }
+
+    // Request user permission
+    const toolUseId = crypto.randomUUID();
+    sendPermissionRequest(toolUseId, toolName, input);
+
+    return new Promise<PermissionResult>((resolve) => {
+      session.pendingPermissions.set(toolUseId, {
+        toolUseId,
+        toolName,
+        input,
+        resolve: (result) => {
+          session.pendingPermissions.delete(toolUseId);
+          resolve(result as PermissionResult);
+        }
+      });
+
+      // Handle abort
+      signal.addEventListener("abort", () => {
+        session.pendingPermissions.delete(toolUseId);
+        resolve({ behavior: "deny", message: "Session aborted" });
+      });
+    });
+  };
+}
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, resumeSessionId, onEvent, onSessionUpdate, provider } = options;
   const abortController = new AbortController();
 
+  // Get permission mode from session (default to "secure" for backward compatibility)
+  const permissionMode: PermissionMode = session.permissionMode ?? "secure";
+  const allowedTools = parseAllowedTools(session.allowedTools);
+
   // Get custom environment variables from provider config, if provided
   const customEnv = provider ? getProviderEnv(provider) : {};
-
 
   const sendMessage = (message: SDKMessage) => {
     onEvent({
@@ -43,6 +138,14 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
     });
   };
 
+  // Create canUseTool function based on permission configuration
+  const canUseTool = createCanUseTool({
+    session,
+    sendPermissionRequest,
+    permissionMode,
+    allowedTools
+  });
+
   // Start the query in the background
   (async () => {
     try {
@@ -55,40 +158,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           // Merge enhancedEnv with custom provider env (custom overrides enhancedEnv)
           env: { ...enhancedEnv, ...customEnv },
           pathToClaudeCodeExecutable: claudeCodePath,
-          permissionMode: "bypassPermissions",
           includePartialMessages: true,
-          allowDangerouslySkipPermissions: true,
-          canUseTool: async (toolName, input, { signal }) => {
-            // For AskUserQuestion, we need to wait for user response
-            if (toolName === "AskUserQuestion") {
-              const toolUseId = crypto.randomUUID();
-
-              // Send permission request to frontend
-              sendPermissionRequest(toolUseId, toolName, input);
-
-              // Create a promise that will be resolved when user responds
-              return new Promise<PermissionResult>((resolve) => {
-                session.pendingPermissions.set(toolUseId, {
-                  toolUseId,
-                  toolName,
-                  input,
-                  resolve: (result) => {
-                    session.pendingPermissions.delete(toolUseId);
-                    resolve(result as PermissionResult);
-                  }
-                });
-
-                // Handle abort
-                signal.addEventListener("abort", () => {
-                  session.pendingPermissions.delete(toolUseId);
-                  resolve({ behavior: "deny", message: "Session aborted" });
-                });
-              });
-            }
-
-            // Auto-approve other tools
-            return { behavior: "allow", updatedInput: input };
-          }
+          // Only use bypass flags in "free" mode
+          ...(permissionMode === "free"
+            ? { permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true }
+            : {}),
+          canUseTool
         }
       });
 

@@ -3,6 +3,7 @@ import type { ClientEvent, ServerEvent } from "./types.js";
 import { runClaude, type RunnerHandle } from "./libs/runner.js";
 import { SessionStore } from "./libs/session-store.js";
 import { loadProviders, saveProvider, deleteProvider, getProvider } from "./libs/provider-config.js";
+import { orchestratorAgent } from "./libs/orchestrator-agent.js";
 import { app } from "electron";
 import { join } from "path";
 
@@ -68,7 +69,8 @@ export function handleClientEvent(event: ClientEvent) {
       cwd: event.payload.cwd,
       title: event.payload.title,
       allowedTools: event.payload.allowedTools,
-      prompt: event.payload.prompt
+      prompt: event.payload.prompt,
+      permissionMode: event.payload.permissionMode
     });
 
     // Get provider configuration if providerId is provided
@@ -270,4 +272,12 @@ export function handleClientEvent(event: ClientEvent) {
   }
 }
 
-export { sessions };
+/**
+ * Initialize IPC handlers and orchestrator
+ * Should be called once during app startup
+ */
+export function initializeHandlers(): void {
+  orchestratorAgent.initialize();
+}
+
+export { sessions, orchestratorAgent };

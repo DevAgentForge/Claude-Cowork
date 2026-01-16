@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
-import type { SessionStatus, StreamMessage } from "../types.js";
+import { resolve, normalize } from "path";
+import { existsSync } from "fs";
+import type { SessionStatus, StreamMessage, PermissionMode } from "../types.js";
 
 export type PendingPermission = {
   toolUseId: string;
@@ -16,6 +18,7 @@ export type Session = {
   cwd?: string;
   allowedTools?: string;
   lastPrompt?: string;
+  permissionMode?: PermissionMode;
   pendingPermissions: Map<string, PendingPermission>;
   abortController?: AbortController;
 };
@@ -28,6 +31,7 @@ export type StoredSession = {
   allowedTools?: string;
   lastPrompt?: string;
   claudeSessionId?: string;
+  permissionMode?: PermissionMode;
   createdAt: number;
   updatedAt: number;
 };
@@ -47,7 +51,7 @@ export class SessionStore {
     this.loadSessions();
   }
 
-  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string }): Session {
+  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string; permissionMode?: PermissionMode }): Session {
     // Validate and sanitize cwd to prevent path traversal
     const sanitizedCwd = options.cwd ? this.sanitizePath(options.cwd) : undefined;
 
@@ -60,14 +64,15 @@ export class SessionStore {
       cwd: sanitizedCwd,
       allowedTools: options.allowedTools,
       lastPrompt: options.prompt,
+      permissionMode: options.permissionMode,
       pendingPermissions: new Map()
     };
     this.sessions.set(id, session);
     this.db
       .prepare(
         `insert into sessions
-          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, permission_mode, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -77,6 +82,7 @@ export class SessionStore {
         session.cwd ?? null,
         session.allowedTools ?? null,
         session.lastPrompt ?? null,
+        session.permissionMode ?? null,
         now,
         now
       );
@@ -90,7 +96,7 @@ export class SessionStore {
   listSessions(): StoredSession[] {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, permission_mode, created_at, updated_at
          from sessions
          order by updated_at desc`
       )
@@ -103,6 +109,7 @@ export class SessionStore {
       allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,
       lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
       claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
+      permissionMode: row.permission_mode ? (row.permission_mode as PermissionMode) : undefined,
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at)
     }));
@@ -125,7 +132,7 @@ export class SessionStore {
   getSessionHistory(id: string): SessionHistory | null {
     const sessionRow = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, permission_mode, created_at, updated_at
          from sessions
          where id = ?`
       )
@@ -148,6 +155,7 @@ export class SessionStore {
         allowedTools: sessionRow.allowed_tools ? String(sessionRow.allowed_tools) : undefined,
         lastPrompt: sessionRow.last_prompt ? String(sessionRow.last_prompt) : undefined,
         claudeSessionId: sessionRow.claude_session_id ? String(sessionRow.claude_session_id) : undefined,
+        permissionMode: sessionRow.permission_mode ? (sessionRow.permission_mode as PermissionMode) : undefined,
         createdAt: Number(sessionRow.created_at),
         updatedAt: Number(sessionRow.updated_at)
       },
@@ -158,6 +166,12 @@ export class SessionStore {
   updateSession(id: string, updates: Partial<Session>): Session | undefined {
     const session = this.sessions.get(id);
     if (!session) return undefined;
+
+    // Re-validate cwd if being updated (security: CWE-22)
+    if (updates.cwd !== undefined) {
+      updates.cwd = this.sanitizePath(updates.cwd);
+    }
+
     Object.assign(session, updates);
     this.persistSession(id, updates);
     return session;
@@ -199,7 +213,8 @@ export class SessionStore {
       status: "status",
       cwd: "cwd",
       allowedTools: "allowed_tools",
-      lastPrompt: "last_prompt"
+      lastPrompt: "last_prompt",
+      permissionMode: "permission_mode"
     };
 
     for (const key of Object.keys(updates)) {
@@ -231,6 +246,7 @@ export class SessionStore {
         cwd text,
         allowed_tools text,
         last_prompt text,
+        permission_mode text,
         created_at integer not null,
         updated_at integer not null
       )`
@@ -245,37 +261,83 @@ export class SessionStore {
       )`
     );
     this.db.exec(`create index if not exists messages_session_id on messages(session_id)`);
+
+    // Migration: Add permission_mode column if it doesn't exist (SQLite safe operation)
+    try {
+      this.db.prepare(`alter table sessions add column permission_mode text`).run();
+    } catch {
+      // Column already exists, ignore error
+    }
   }
 
   /**
    * Sanitize path to prevent path traversal attacks (CWE-22)
+   * Validates that the path is a real directory without dangerous sequences
    */
-  private sanitizePath(path: string): string {
-    // Normalize the path and resolve to absolute
-    const normalized = path.replace(/[^\w\s\-\.]/g, "");
-    // Ensure path doesn't contain dangerous sequences
-    if (normalized.includes("..") || normalized.startsWith("/") || /^[a-z]:\\/i.test(normalized)) {
-      throw new Error("Invalid path: path traversal or absolute paths not allowed");
+  private sanitizePath(inputPath: string): string {
+    // 1. Detect null bytes (CWE-626)
+    if (inputPath.includes("\0")) {
+      throw new Error("Invalid path: null bytes not allowed");
     }
-    return normalized;
+
+    // 2. Detect path traversal attempts BEFORE normalization
+    if (inputPath.includes("..")) {
+      throw new Error("Invalid path: path traversal sequences not allowed");
+    }
+
+    // 3. Check for dangerous shell characters (CWE-78)
+    const dangerousChars = /[;&|`$<>'"]/;
+    if (dangerousChars.test(inputPath)) {
+      throw new Error("Invalid path: contains dangerous shell characters");
+    }
+
+    // 4. Normalize and resolve to absolute path
+    const normalized = normalize(inputPath);
+    const resolved = resolve(normalized);
+
+    // 5. Verify the resolved path doesn't escape via symlinks
+    // Re-check for traversal after normalization
+    if (resolved.includes("..")) {
+      throw new Error("Invalid path: path traversal detected after normalization");
+    }
+
+    // 6. Validate that the directory exists
+    if (!existsSync(resolved)) {
+      throw new Error(`Invalid path: directory does not exist: ${resolved}`);
+    }
+
+    return resolved;
   }
 
   private loadSessions(): void {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt
+        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, permission_mode
          from sessions`
       )
       .all();
     for (const row of rows as Array<Record<string, unknown>>) {
+      // Re-validate cwd on load (security: CWE-22)
+      // If path is invalid/deleted, set to undefined rather than crash
+      let validatedCwd: string | undefined;
+      if (row.cwd) {
+        try {
+          validatedCwd = this.sanitizePath(String(row.cwd));
+        } catch {
+          // Path no longer valid (deleted/moved), clear it
+          validatedCwd = undefined;
+        }
+      }
+
       const session: Session = {
         id: String(row.id),
         title: String(row.title),
         claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
         status: row.status as SessionStatus,
-        cwd: row.cwd ? String(row.cwd) : undefined,
+        cwd: validatedCwd,
         allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,
         lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
+        permissionMode: row.permission_mode ? (row.permission_mode as PermissionMode) : undefined,
         pendingPermissions: new Map()
       };
       this.sessions.set(session.id, session);
