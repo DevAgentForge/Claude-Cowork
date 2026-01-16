@@ -1,13 +1,25 @@
+import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 
-export default function MDContent({ text }: { text: string }) {
+// Memoized markdown component to prevent re-renders
+const MDContent = memo(function MDContent({ text, isStreaming = false }: { text: string; isStreaming?: boolean }) {
+  // During streaming, skip expensive plugins for better performance
+  const plugins = useMemo(() => {
+    if (isStreaming) {
+      // Lightweight plugins during streaming
+      return { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeRaw] };
+    }
+    // Full plugins for completed messages
+    return { remarkPlugins: [remarkGfm], rehypePlugins: [rehypeRaw, rehypeHighlight] };
+  }, [isStreaming]);
+
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeRaw, rehypeHighlight]}
+      remarkPlugins={plugins.remarkPlugins}
+      rehypePlugins={plugins.rehypePlugins}
       components={{
         h1: (props) => <h1 className="mt-4 text-xl font-semibold text-ink-900" {...props} />,
         h2: (props) => <h2 className="mt-4 text-lg font-semibold text-ink-900" {...props} />,
@@ -43,5 +55,7 @@ export default function MDContent({ text }: { text: string }) {
     >
       {String(text ?? "")}
     </ReactMarkdown>
-  )
-}
+  );
+});
+
+export default MDContent;

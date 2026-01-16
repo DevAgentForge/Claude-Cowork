@@ -80,6 +80,8 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
 export function PromptInput({ sendEvent }: PromptInputProps) {
   const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const heightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPromptLengthRef = useRef<number>(0);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey) return;
@@ -88,8 +90,7 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
     handleSend();
   };
 
-  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    const target = e.currentTarget;
+  const adjustHeight = useCallback((target: HTMLTextAreaElement) => {
     target.style.height = "auto";
     const scrollHeight = target.scrollHeight;
     if (scrollHeight > MAX_HEIGHT) {
@@ -99,20 +100,42 @@ export function PromptInput({ sendEvent }: PromptInputProps) {
       target.style.height = `${scrollHeight}px`;
       target.style.overflowY = "hidden";
     }
+  }, []);
+
+  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = e.currentTarget;
+
+    // Clear any pending height adjustment
+    if (heightTimeoutRef.current) {
+      clearTimeout(heightTimeoutRef.current);
+    }
+
+    // Debounce height calculation (~1 frame at 60fps)
+    heightTimeoutRef.current = setTimeout(() => {
+      adjustHeight(target);
+    }, 16);
   };
 
+  // Handle programmatic prompt changes (e.g., clear after send)
   useEffect(() => {
     if (!promptRef.current) return;
-    promptRef.current.style.height = "auto";
-    const scrollHeight = promptRef.current.scrollHeight;
-    if (scrollHeight > MAX_HEIGHT) {
-      promptRef.current.style.height = `${MAX_HEIGHT}px`;
-      promptRef.current.style.overflowY = "auto";
-    } else {
-      promptRef.current.style.height = `${scrollHeight}px`;
-      promptRef.current.style.overflowY = "hidden";
+
+    // Only adjust if prompt length changed significantly (programmatic change)
+    const lengthDiff = Math.abs(prompt.length - lastPromptLengthRef.current);
+    if (lengthDiff > 10 || prompt.length === 0) {
+      adjustHeight(promptRef.current);
     }
-  }, [prompt]);
+    lastPromptLengthRef.current = prompt.length;
+  }, [prompt, adjustHeight]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (heightTimeoutRef.current) {
+        clearTimeout(heightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <section className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-surface via-surface to-transparent pb-6 px-2 lg:pb-8 pt-8 lg:ml-[280px]">

@@ -1,7 +1,11 @@
-import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import { query, type SDKMessage, type PermissionResult, type SettingSource, type AgentDefinition, type SdkPluginConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { ServerEvent, PermissionMode } from "../types.js";
 import type { Session } from "./session-store.js";
 import { claudeCodePath, enhancedEnv } from "./util.js";
+import { settingsManager } from "./settings-manager.js";
+import { existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 /**
  * Timeout for permission requests (5 minutes)
@@ -25,6 +29,64 @@ export type RunnerHandle = {
 };
 
 const DEFAULT_CWD = process.cwd();
+
+/**
+ * Get setting sources for loading ~/.claude/ configuration
+ * This enables agents, skills, hooks, and plugins from user settings
+ */
+function getSettingSources(): SettingSource[] {
+  return ["user", "project", "local"];
+}
+
+/**
+ * Get custom agents from settings manager
+ * Converts activeSkills to AgentDefinition format for SDK
+ */
+function getCustomAgents(): Record<string, AgentDefinition> {
+  const agents: Record<string, AgentDefinition> = {};
+  const skills = settingsManager.getActiveSkills();
+
+  for (const skill of skills) {
+    // Only convert skill-type entries (not slash commands)
+    if (skill.type === "skill") {
+      agents[skill.name] = {
+        description: `Custom skill: ${skill.name}`,
+        prompt: `You are executing the ${skill.name} skill. Follow the skill's instructions precisely.`,
+        model: "sonnet"
+      };
+    }
+  }
+
+  return agents;
+}
+
+/**
+ * Get local plugins from ~/.claude/plugins/ directory
+ */
+function getLocalPlugins(): SdkPluginConfig[] {
+  const plugins: SdkPluginConfig[] = [];
+  const pluginsDir = join(homedir(), ".claude", "plugins");
+
+  if (existsSync(pluginsDir)) {
+    // The SDK will scan this directory automatically when settingSources includes 'user'
+    // We can add explicit plugin paths here if needed
+    console.log(`[Runner] Plugins directory exists: ${pluginsDir}`);
+  }
+
+  // Get enabled plugins from settings
+  const enabledPlugins = settingsManager.getEnabledPlugins();
+  for (const [name, config] of enabledPlugins) {
+    if (config.enabled) {
+      const pluginPath = join(pluginsDir, name);
+      if (existsSync(pluginPath)) {
+        plugins.push({ type: "local", path: pluginPath });
+        console.log(`[Runner] Adding plugin: ${name} from ${pluginPath}`);
+      }
+    }
+  }
+
+  return plugins;
+}
 
 /**
  * Parse comma-separated list of allowed tools into a Set
@@ -139,7 +201,13 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
   // SECURITY: providerEnv is already prepared by ipc-handlers with decrypted token
   // Tokens are decrypted on-demand in main process and passed here as env vars
+  console.log(`[Runner] providerEnv received:`, providerEnv ? {
+    ANTHROPIC_MODEL: providerEnv.ANTHROPIC_MODEL,
+    ANTHROPIC_BASE_URL: providerEnv.ANTHROPIC_BASE_URL,
+    hasToken: !!providerEnv.ANTHROPIC_AUTH_TOKEN
+  } : "null/undefined");
   const customEnv = providerEnv || {};
+  console.log(`[Runner] customEnv keys:`, Object.keys(customEnv));
 
   const sendMessage = (message: SDKMessage) => {
     onEvent({
@@ -166,6 +234,20 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   // Start the query in the background
   (async () => {
     try {
+      // Debug: log which model is being used
+      const modelUsed = customEnv.ANTHROPIC_MODEL || enhancedEnv.ANTHROPIC_MODEL || "default (claude-sonnet-4-20250514)";
+      console.log(`[Runner] Starting session with model: ${modelUsed}`);
+      console.log(`[Runner] Base URL: ${customEnv.ANTHROPIC_BASE_URL || enhancedEnv.ANTHROPIC_BASE_URL || "default"}`);
+
+      // Get settings for agents, plugins, and hooks
+      const settingSources = getSettingSources();
+      const customAgents = getCustomAgents();
+      const plugins = getLocalPlugins();
+
+      console.log(`[Runner] settingSources: ${settingSources.join(", ")}`);
+      console.log(`[Runner] customAgents: ${Object.keys(customAgents).join(", ") || "none"}`);
+      console.log(`[Runner] plugins: ${plugins.length} loaded`);
+
       const q = query({
         prompt,
         options: {
@@ -176,6 +258,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
           env: { ...enhancedEnv, ...customEnv },
           pathToClaudeCodeExecutable: claudeCodePath,
           includePartialMessages: true,
+          // CRITICAL: Load settings from ~/.claude/ (enables agents, skills, hooks, plugins)
+          settingSources,
+          // Custom agents defined programmatically
+          ...(Object.keys(customAgents).length > 0 ? { agents: customAgents } : {}),
+          // Local plugins
+          ...(plugins.length > 0 ? { plugins } : {}),
           // Only use bypass flags in "free" mode
           ...(permissionMode === "free"
             ? { permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true }

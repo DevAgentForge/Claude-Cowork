@@ -52,7 +52,12 @@ function AppContent() {
     }
   };
 
-  // Handle partial messages from stream events
+  // Throttle state for partial message updates (performance optimization)
+  const lastUpdateRef = useRef<number>(0);
+  const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const THROTTLE_MS = 50; // Update UI at most every 50ms
+
+  // Handle partial messages from stream events with throttling
   const handlePartialMessages = useCallback((partialEvent: ServerEvent) => {
     if (partialEvent.type !== "stream.message" || partialEvent.payload.message.type !== "stream_event") return;
 
@@ -62,15 +67,35 @@ function AppContent() {
       partialMessageRef.current = "";
       setPartialMessage(partialMessageRef.current);
       setShowPartialMessage(true);
+      lastUpdateRef.current = 0;
     }
 
     if (message.event.type === "content_block_delta") {
       partialMessageRef.current += getPartialMessageContent(message.event) || "";
-      setPartialMessage(partialMessageRef.current);
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+      // Throttle UI updates for better performance
+      const now = Date.now();
+      if (now - lastUpdateRef.current >= THROTTLE_MS) {
+        lastUpdateRef.current = now;
+        setPartialMessage(partialMessageRef.current);
+      } else if (!pendingUpdateRef.current) {
+        // Schedule an update for the remaining throttle time
+        pendingUpdateRef.current = setTimeout(() => {
+          pendingUpdateRef.current = null;
+          lastUpdateRef.current = Date.now();
+          setPartialMessage(partialMessageRef.current);
+        }, THROTTLE_MS - (now - lastUpdateRef.current));
+      }
     }
 
     if (message.event.type === "content_block_stop") {
+      // Clear any pending update
+      if (pendingUpdateRef.current) {
+        clearTimeout(pendingUpdateRef.current);
+        pendingUpdateRef.current = null;
+      }
+      // Final update with complete content
+      setPartialMessage(partialMessageRef.current);
       setShowPartialMessage(false);
       setTimeout(() => {
         partialMessageRef.current = "";
@@ -109,8 +134,32 @@ function AppContent() {
     }
   }, [activeSessionId, connected, sessions, historyRequested, markHistoryRequested, sendEvent]);
 
+  // Optimized scroll - throttled to avoid excessive DOM operations
+  const lastScrollRef = useRef<number>(0);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SCROLL_THROTTLE_MS = 150;
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const now = Date.now();
+    const shouldScroll = now - lastScrollRef.current >= SCROLL_THROTTLE_MS;
+
+    if (shouldScroll) {
+      lastScrollRef.current = now;
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    } else if (!scrollTimeoutRef.current) {
+      scrollTimeoutRef.current = setTimeout(() => {
+        scrollTimeoutRef.current = null;
+        lastScrollRef.current = Date.now();
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, SCROLL_THROTTLE_MS);
+    }
+
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+    };
   }, [messages, partialMessage]);
 
   const handleNewSession = useCallback(() => {
@@ -122,8 +171,8 @@ function AppContent() {
     sendEvent({ type: "session.delete", payload: { sessionId } });
   }, [sendEvent]);
 
-  const handleOpenProviderSettings = useCallback(() => {
-    setEditingProvider(null);
+  const handleOpenProviderSettings = useCallback((provider: SafeProviderConfig | null) => {
+    setEditingProvider(provider);
     setShowProviderModal(true);
   }, [setShowProviderModal]);
 
@@ -191,7 +240,7 @@ function AppContent() {
 
             {/* Partial message display with skeleton loading */}
             <div className="partial-message">
-              <MDContent text={partialMessage} />
+              <MDContent text={partialMessage} isStreaming={showPartialMessage} />
               {showPartialMessage && (
                 <div className="mt-3 flex flex-col gap-2 px-1">
                   <div className="relative h-3 w-2/12 overflow-hidden rounded-full bg-ink-900/10">

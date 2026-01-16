@@ -39,6 +39,7 @@ export type SafeProviderConfig = {
   };
   hasToken: boolean; // Indicates if token is configured (without exposing it)
   isDefault?: boolean; // Indicates if this is a default/builtin provider
+  description?: string; // Description for default provider templates
 };
 
 export type UserPromptMessage = {

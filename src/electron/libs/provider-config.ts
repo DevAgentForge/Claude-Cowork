@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, chmodSync } from "fs";
 import { join } from "path";
 import { app, safeStorage } from "electron";
 import { randomUUID } from "crypto";
+import { getDefaultProviderTemplates, getDefaultProvider } from "./default-providers.js";
 
 const PROVIDERS_FILE = join(app.getPath("userData"), "providers.json");
 
@@ -191,10 +192,11 @@ export function loadProviders(): LlmProviderConfig[] {
 /**
  * Load providers WITHOUT tokens - SAFE to send to renderer process
  * This function never decrypts tokens, ensuring they stay in main process
+ * Includes default provider templates if no custom providers exist
  * @returns Safe provider configs without sensitive data
  */
 export function loadProvidersSafe(): SafeProviderConfig[] {
-  return readProvidersFile().map(p => ({
+  const userProviders = readProvidersFile().map(p => ({
     id: p.id,
     name: p.name,
     baseUrl: p.baseUrl,
@@ -203,6 +205,15 @@ export function loadProvidersSafe(): SafeProviderConfig[] {
     hasToken: Boolean(p.authToken && p.authToken.length > 0),
     isDefault: false
   }));
+
+  // Include default provider templates for easy selection
+  const defaultTemplates = getDefaultProviderTemplates();
+
+  // Filter out templates that user has already customized (same baseUrl)
+  const userBaseUrls = new Set(userProviders.map(p => p.baseUrl));
+  const uniqueTemplates = defaultTemplates.filter(t => !userBaseUrls.has(t.baseUrl));
+
+  return [...userProviders, ...uniqueTemplates];
 }
 
 export function saveProvider(provider: LlmProviderConfig): LlmProviderConfig {
@@ -348,8 +359,25 @@ export function saveProviderFromPayload(payload: ProviderSavePayload): SafeProvi
  * Get environment variables for a provider by ID
  * Decrypts token on-demand - ONLY for use with subprocess
  * This function should ONLY be called from runner.ts when starting Claude
+ * Also supports default provider templates (prefixed with "template_")
  */
 export function getProviderEnvById(providerId: string): Record<string, string> | null {
+  // Check if it's a default provider template
+  if (providerId.startsWith("template_")) {
+    const templateId = providerId.replace("template_", "");
+    const defaultProvider = getDefaultProvider(templateId);
+    if (defaultProvider) {
+      console.log(`[ProviderConfig] Using default provider template: ${templateId}`);
+      // Use the default provider config with its envOverrides
+      const env = getProviderEnv(defaultProvider as LlmProviderConfig);
+      // Apply envOverrides from the default provider
+      if (defaultProvider.envOverrides) {
+        Object.assign(env, defaultProvider.envOverrides);
+      }
+      return env;
+    }
+  }
+
   const provider = getProvider(providerId);
   if (!provider) return null;
   return getProviderEnv(provider);

@@ -112,7 +112,13 @@ export function handleClientEvent(event: ClientEvent) {
     });
 
     // Get provider env vars if providerId is provided (decryption happens here in main process)
+    console.log(`[IPC] session.start - providerId: ${event.payload.providerId || "none (using default)"}`);
     const providerEnv = event.payload.providerId ? getProviderEnvById(event.payload.providerId) : null;
+    console.log(`[IPC] session.start - providerEnv:`, providerEnv ? {
+      ANTHROPIC_MODEL: providerEnv.ANTHROPIC_MODEL,
+      ANTHROPIC_BASE_URL: providerEnv.ANTHROPIC_BASE_URL,
+      hasToken: !!providerEnv.ANTHROPIC_AUTH_TOKEN
+    } : "null");
 
     sessions.updateSession(session.id, {
       status: "running",
