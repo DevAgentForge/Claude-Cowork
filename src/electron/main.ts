@@ -9,6 +9,7 @@ import { saveApiConfig } from "./libs/config-store.js";
 import { getCurrentApiConfig } from "./libs/claude-settings.js";
 import type { ClientEvent } from "./types.js";
 import "./libs/claude-settings.js";
+import { initializeMCPManager, cleanupMCPManager } from "./libs/mcp-manager.js";
 
 let cleanupComplete = false;
 let mainWindow: BrowserWindow | null = null;
@@ -34,6 +35,7 @@ function cleanup(): void {
     stopPolling();
     cleanupAllSessions();
     killViteDevServer();
+    cleanupMCPManager();
 }
 
 function handleSignal(): void {
@@ -76,6 +78,17 @@ app.on("ready", () => {
     globalShortcut.register('CommandOrControl+Q', () => {
         cleanup();
         app.quit();
+    });
+
+    // Initialize MCP manager asynchronously (non-blocking)
+    initializeMCPManager().then((success) => {
+        if (success) {
+            console.log('MCP integration initialized successfully');
+        } else {
+            console.warn('MCP integration failed or disabled');
+        }
+    }).catch((error) => {
+        console.error('MCP initialization error:', error);
     });
 
     pollResources(mainWindow);

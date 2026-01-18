@@ -4,6 +4,7 @@ import type { Session } from "./session-store.js";
 
 import { getCurrentApiConfig, buildEnvForConfig } from "./claude-settings.js";
 import { getClaudeCodePath, enhancedEnv} from "./util.js";
+import { getMCPManager } from "./mcp-manager.js";
 
 
 export type RunnerOptions = {
@@ -88,6 +89,47 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
                   session.pendingPermissions.delete(toolUseId);
                   resolve({ behavior: "deny", message: "Session aborted" });
                 });
+              });
+            }
+
+            // Check if this is an MCP tool
+            const mcpManager = getMCPManager();
+            if (mcpManager.isReady() && mcpManager.hasTool(toolName)) {
+              // Execute MCP tool asynchronously
+              // We return a promise that will execute the tool and return permission result
+              return new Promise<PermissionResult>(async (resolve, reject) => {
+                try {
+                  // Execute MCP tool
+                  const result = await mcpManager.executeTool(toolName, input);
+
+                  // Create a tool result message to send to the AI
+                  // This simulates the tool execution result that would normally come from Claude Agent SDK
+                  const toolResultMessage: SDKMessage = {
+                    type: "user",
+                    message: {
+                      content: [
+                        {
+                          type: "tool_result",
+                          tool_use_id: crypto.randomUUID(),
+                          content: result.content,
+                          is_error: result.isError || false
+                        }
+                      ]
+                    }
+                  };
+
+                  // Send the tool result to the message stream
+                  sendMessage(toolResultMessage);
+
+                  // Return permission allowed - the tool has already been executed
+                  resolve({ behavior: "allow", updatedInput: input });
+                } catch (error) {
+                  // If MCP tool execution fails, deny permission
+                  resolve({
+                    behavior: "deny",
+                    message: `MCP tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+                  });
+                }
               });
             }
 
