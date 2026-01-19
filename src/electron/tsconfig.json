@@ -7,6 +7,7 @@
         "skipLibCheck": true,
         // add global types
         "types": [
+            "node",
             "../../types"
         ]
     }

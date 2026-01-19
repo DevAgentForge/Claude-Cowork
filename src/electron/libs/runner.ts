@@ -104,7 +104,7 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
 
                   // Create a tool result message to send to the AI
                   // This simulates the tool execution result that would normally come from Claude Agent SDK
-                  const toolResultMessage: SDKMessage = {
+                  const toolResultMessage: any = {
                     type: "user",
                     message: {
                       content: [

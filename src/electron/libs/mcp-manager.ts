@@ -81,7 +81,7 @@ export class MCPManager {
       );
 
       // Connect to server via stdio
-      const transport = new StdioClientTransport(this.serverProcess);
+      const transport = new StdioClientTransport(this.serverProcess as any);
       await this.client.connect(transport);
 
       logger.info('MCP client connected successfully');
