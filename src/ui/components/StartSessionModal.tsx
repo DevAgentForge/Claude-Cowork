@@ -120,7 +120,7 @@ export function StartSessionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/20 px-4 py-8 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-lg rounded-2xl border border-ink-900/5 bg-surface p-6 shadow-elevated my-8">
+      <div className="w-full max-w-xl rounded-2xl border border-ink-900/5 bg-surface p-6 shadow-elevated my-8">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-ink-800">Start Session</div>
           <button className="rounded-full p-1.5 text-muted hover:bg-surface-tertiary hover:text-ink-700 transition-colors" onClick={onClose} aria-label="Close">
@@ -172,37 +172,41 @@ export function StartSessionModal({
           </label>
 
           {/* Session Mode Presets */}
-          <div className="grid gap-1.5">
+          <div className="grid gap-2">
             <span className="text-xs font-medium text-muted">Session Mode</span>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(SESSION_PRESETS) as [keyof typeof SESSION_PRESETS, typeof SESSION_PRESETS[keyof typeof SESSION_PRESETS]][]).map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handlePresetChange(key)}
-                  className={`flex flex-col items-start rounded-xl border p-3 text-left transition-colors ${
-                    selectedPreset === key
-                      ? key === "free" || key === "developer"
-                        ? "border-warning/60 bg-warning/10"
-                        : "border-accent/60 bg-accent/10"
-                      : "border-ink-900/10 bg-surface hover:border-ink-900/20"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {key === "free" || key === "developer" ? (
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-warning" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-accent" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    )}
-                    <span className="text-sm font-medium text-ink-800">{preset.name}</span>
-                  </div>
-                  <span className="mt-1 text-xs text-muted">{preset.description}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.entries(SESSION_PRESETS) as [keyof typeof SESSION_PRESETS, typeof SESSION_PRESETS[keyof typeof SESSION_PRESETS]][]).map(([key, preset]) => {
+                const isUnsafe = key === "free" || key === "developer";
+                const isSelected = selectedPreset === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handlePresetChange(key)}
+                    className={`flex min-h-[72px] flex-col items-start justify-center rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                      isSelected
+                        ? isUnsafe
+                          ? "border-warning bg-warning/10 shadow-sm"
+                          : "border-accent bg-accent/10 shadow-sm"
+                        : "border-ink-900/10 bg-surface hover:border-ink-900/20 hover:bg-surface-secondary"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isUnsafe ? (
+                        <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 ${isSelected ? "text-warning" : "text-warning/60"}`} fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 ${isSelected ? "text-accent" : "text-accent/60"}`} fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      )}
+                      <span className={`text-sm font-semibold ${isSelected ? "text-ink-900" : "text-ink-700"}`}>{preset.name}</span>
+                    </div>
+                    <span className="mt-1.5 text-xs leading-snug text-muted">{preset.description}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

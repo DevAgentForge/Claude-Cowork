@@ -39,6 +39,9 @@
   --color-success-light: #DCFCE7;
   --color-info: #2563EB;
   --color-info-light: #DBEAFE;
+  --color-warning: #F59E0B;
+  --color-warning-dark: #D97706;
+  --color-warning-light: #FEF3C7;
   
   /* Background colors */
   --color-bg-000: #FFFFFF;
