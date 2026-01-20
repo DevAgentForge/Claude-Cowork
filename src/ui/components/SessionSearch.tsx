@@ -157,18 +157,6 @@ export function SessionSearch({ onSelectSession, onClose }: SessionSearchProps) 
   const [error, setError] = useState<string | null>(null);
   const [searchType, setSearchType] = useState<"basic" | "advanced">("basic");
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (query.trim()) {
-        performSearch();
-      } else {
-        setSessions([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [query, searchType, performSearch]);
-
   const performSearch = useCallback(async () => {
     if (!query.trim()) return;
 
@@ -194,6 +182,18 @@ export function SessionSearch({ onSelectSession, onClose }: SessionSearchProps) 
       setLoading(false);
     }
   }, [query, searchType]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (query.trim()) {
+        performSearch();
+      } else {
+        setSessions([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [query, performSearch]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20%] px-4">
