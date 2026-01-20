@@ -4,6 +4,15 @@
 	"version": "0.1.0",
 	"type": "module",
 	"main": "dist-electron/main.js",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/selfsupervised-ai/agent-cowork.git"
+	},
+	"author": "selfsupervised-ai",
+	"homepage": "https://github.com/selfsupervised-ai/agent-cowork#readme",
+	"bugs": {
+		"url": "https://github.com/selfsupervised-ai/agent-cowork/issues"
+	},
 	"scripts": {
 		"rebuild": "npx electron-rebuild -f -w better-sqlite3",
 		"dev": "pkill -f vite 2>/dev/null; pkill -f electron 2>/dev/null; sleep 1; bun run dev:react & bun run dev:electron",
@@ -16,7 +25,8 @@
 		"dist:mac-arm64": "bun run transpile:electron && bun run build && electron-builder --mac --arm64",
 		"dist:mac-x64": "bun run transpile:electron && bun run build && electron-builder --mac --x64",
 		"dist:win": "bun run transpile:electron && bun run build && electron-builder --win --x64",
-		"dist:linux": "bun run transpile:electron && bun run build && electron-builder --linux --x64"
+		"dist:linux": "bun run transpile:electron && bun run build && electron-builder --linux --x64",
+		"postinstall": "electron-rebuild"
 	},
 	"dependencies": {
 		"@anthropic-ai/claude-agent-sdk": "^0.2.6",
@@ -38,6 +48,7 @@
 		"zustand": "^5.0.10"
 	},
 	"devDependencies": {
+		"@electron/rebuild": "^4.0.2",
 		"@eslint/js": "^9.39.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/os-utils": "^0.0.4",

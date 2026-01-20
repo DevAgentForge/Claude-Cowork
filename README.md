@@ -3,8 +3,8 @@
 
 # Open Claude Cowork
 
-[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
-[![Platform](https://img.shields.io/badge/platform-%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
+[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/selfsupervised-ai/agent-cowork/releases)
+[![Platform](https://img.shields.io/badge/platform-%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/selfsupervised-ai/agent-cowork/releases)
 
 [简体中文](README_ZH.md)
 
@@ -53,7 +53,7 @@ That means:
 
 ### Option 1: Download a Release
 
-👉 [Go to Releases](https://github.com/DevAgentForge/agent-cowork/releases)
+👉 [Go to Releases](https://github.com/selfsupervised-ai/agent-cowork/releases)
 
 
 ### Option 2: Build from Source
@@ -65,7 +65,7 @@ That means:
 
 bash
 #### Clone the repository
-git clone https://github.com/DevAgentForge/agent-cowork.git
+git clone https://github.com/selfsupervised-ai/agent-cowork.git
 cd agent-cowork
 
 #### Install dependencies

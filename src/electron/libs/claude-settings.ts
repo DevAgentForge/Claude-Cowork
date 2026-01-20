@@ -69,6 +69,7 @@ export function getCurrentApiConfig(): ApiConfig | null {
 export function buildEnvForConfig(config: ApiConfig): Record<string, string> {
   const baseEnv = { ...process.env } as Record<string, string>;
 
+  baseEnv.ANTHROPIC_API_KEY = config.apiKey;
   baseEnv.ANTHROPIC_AUTH_TOKEN = config.apiKey;
   baseEnv.ANTHROPIC_BASE_URL = config.baseURL;
   baseEnv.ANTHROPIC_MODEL = config.model;
