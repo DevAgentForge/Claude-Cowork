@@ -31,9 +31,14 @@ export function SessionInfoModal({ open, onOpenChange, metadata, sessionTitle }:
         <Dialog.Overlay className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl">
           <div className="flex items-start justify-between gap-4 mb-4">
-            <Dialog.Title className="text-lg font-semibold text-ink-800">
-              Session Info
-            </Dialog.Title>
+            <div>
+              <Dialog.Title className="text-lg font-semibold text-ink-800">
+                Session Info
+              </Dialog.Title>
+              <Dialog.Description className="sr-only">
+                View session configuration and usage statistics
+              </Dialog.Description>
+            </div>
             <Dialog.Close asChild>
               <button className="rounded-full p-1 text-ink-500 hover:bg-ink-900/10" aria-label="Close dialog">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
