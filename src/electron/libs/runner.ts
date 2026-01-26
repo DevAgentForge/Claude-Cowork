@@ -62,12 +62,20 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       };
 
       // 构建 MCP Servers 配置（使用 MCP Manager）
+      // 如果配置了 persistBrowser，会自动启动 SSE Server
       const manager = getMCPManager();
-      const mcpServers = manager.buildSDKConfig();
+      const mcpServers = await manager.buildSDKConfigAsync();
       const mcpServerCount = Object.keys(mcpServers).length;
 
       if (mcpServerCount > 0) {
         console.log(`[MCP] Configured ${mcpServerCount} MCP server(s) for Claude SDK:`, Object.keys(mcpServers));
+
+        // 检查是否有 SSE 模式的 Server
+        for (const [id, config] of Object.entries(mcpServers)) {
+          if ('url' in config) {
+            console.log(`[MCP] Server ${id} using SSE mode at ${config.url}`);
+          }
+        }
       } else {
         console.log('[MCP] No MCP servers configured');
       }

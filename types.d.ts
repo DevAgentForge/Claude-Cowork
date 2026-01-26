@@ -14,6 +14,8 @@ type UnsubscribeFunction = () => void;
 
 type MCPServerStatus = "running" | "stopped" | "error" | "starting";
 
+type MCPBrowserMode = "visible" | "headless";
+
 type MCPServerInfo = {
     id: string;
     name: string;
@@ -21,9 +23,34 @@ type MCPServerInfo = {
     enabled: boolean;
     isBuiltin?: boolean;
     builtinType?: string;
-    browserMode?: "visible" | "headless";
+    browserMode?: MCPBrowserMode;
+    /** 用户数据目录（用于持久化浏览器会话） */
+    userDataDir?: string;
+    /** 是否跨对话保持浏览器 */
+    persistBrowser?: boolean;
     status: MCPServerStatus;
     errorMessage?: string;
+}
+
+/** 浏览器 MCP 配置选项 */
+type MCPBrowserConfigOptions = {
+    /** 浏览器运行模式：visible（可见）或 headless（无界面） */
+    browserMode?: MCPBrowserMode;
+    /** 用户数据目录（null 表示清除） */
+    userDataDir?: string | null;
+    /** 便捷选项：是否启用会话持久化 */
+    enablePersistence?: boolean;
+    /** 是否跨对话保持浏览器（使用 SSE 模式） */
+    persistBrowser?: boolean;
+}
+
+/** 浏览器 MCP 配置更新结果 */
+type MCPBrowserConfigResult = {
+    success: boolean;
+    browserMode?: MCPBrowserMode;
+    userDataDir?: string;
+    /** 是否跨对话保持浏览器 */
+    persistBrowser?: boolean;
 }
 
 type EventPayloadMapping = {
@@ -43,6 +70,8 @@ type EventPayloadMapping = {
     "mcp-add-server": { success: boolean; serverId: string };
     "mcp-update-server": { success: boolean };
     "mcp-delete-server": { success: boolean };
+    "mcp-update-browser-config": MCPBrowserConfigResult;
+    "mcp-get-default-user-data-dir": string;
 }
 
 type MCPServerFormData = {
@@ -76,5 +105,8 @@ interface Window {
         updateMCPServer: (serverId: string, config: Partial<MCPServerFormData>) => Promise<{ success: boolean }>;
         deleteMCPServer: (serverId: string) => Promise<{ success: boolean }>;
         onMCPStatusChange: (callback: (serverId: string, status: MCPServerStatus, error?: string) => void) => UnsubscribeFunction;
+        // 浏览器 MCP 配置 API
+        updateBrowserConfig: (options: MCPBrowserConfigOptions) => Promise<MCPBrowserConfigResult>;
+        getDefaultUserDataDir: () => Promise<string>;
     }
 }

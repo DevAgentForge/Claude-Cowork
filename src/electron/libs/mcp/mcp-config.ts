@@ -38,6 +38,11 @@ export interface MCPServerConfig {
     browserMode?: MCPBrowserMode;
     /** 用户数据目录（用于持久化浏览器会话，仅对浏览器工具有效） */
     userDataDir?: string;
+    /** 
+     * 是否跨对话保持浏览器（仅对浏览器工具有效）
+     * 启用后将使用 SSE 模式运行 MCP Server，浏览器状态可跨多次对话保持
+     */
+    persistBrowser?: boolean;
     /** 创建时间 */
     createdAt: string;
     /** 更新时间 */

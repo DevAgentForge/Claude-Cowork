@@ -45,6 +45,8 @@ interface IPCServerInfo {
     browserMode?: "visible" | "headless";
     /** 用户数据目录（用于持久化浏览器会话） */
     userDataDir?: string;
+    /** 是否跨对话保持浏览器 */
+    persistBrowser?: boolean;
 }
 
 /**
@@ -64,6 +66,7 @@ function toServerInfo(config: MCPServerConfig): IPCServerInfo {
         builtinType: config.builtinType,
         browserMode: config.browserMode,
         userDataDir: config.userDataDir,
+        persistBrowser: config.persistBrowser,
     };
 }
 
@@ -228,11 +231,12 @@ export function setupMCPHandlers(win: BrowserWindow): void {
         return { success: true };
     });
 
-    // 更新浏览器自动化配置（headless 模式和持久化会话）
+    // 更新浏览器自动化配置（headless 模式、持久化会话、跨对话保持）
     ipcMain.handle("mcp-update-browser-config", async (_, options: {
         browserMode?: MCPBrowserMode;
         userDataDir?: string | null;  // null 表示清除
         enablePersistence?: boolean;   // 便捷选项：是否启用持久化
+        persistBrowser?: boolean;      // 是否跨对话保持浏览器
     }) => {
         if (!manager) throw new Error("MCP Manager not initialized");
 
@@ -253,16 +257,31 @@ export function setupMCPHandlers(win: BrowserWindow): void {
 
         // 更新 Playwright 配置
         const browserMode = options.browserMode ?? server.browserMode ?? "visible";
-        const updatedServer = updatePlaywrightConfig(server, browserMode, userDataDir);
+        const persistBrowser = options.persistBrowser;
+        const updatedServer = updatePlaywrightConfig(server, browserMode, userDataDir, persistBrowser);
 
         // 更新配置
         config = updateMCPServer(config, PLAYWRIGHT_SERVER_ID, updatedServer);
         manager.updateConfig(config);
 
+        // 如果启用了跨对话保持，尝试启动 SSE Server
+        if (updatedServer.persistBrowser && updatedServer.enabled) {
+            try {
+                await manager.ensureSSEServerRunning();
+            } catch (error) {
+                console.error("Failed to start SSE server:", error);
+                // 不抛出错误，配置已保存，下次对话时会重试
+            }
+        } else if (!updatedServer.persistBrowser) {
+            // 如果禁用了跨对话保持，停止 SSE Server
+            await manager.stopSSEServer();
+        }
+
         return {
             success: true,
             browserMode: updatedServer.browserMode,
             userDataDir: updatedServer.userDataDir,
+            persistBrowser: updatedServer.persistBrowser,
         };
     });
 

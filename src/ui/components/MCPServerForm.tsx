@@ -3,7 +3,7 @@
  * 支持添加和编辑 MCP Server 配置
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 /** 表单数据类型 */
 interface MCPServerFormData {

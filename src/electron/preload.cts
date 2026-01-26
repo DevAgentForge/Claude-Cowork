@@ -57,7 +57,16 @@ electron.contextBridge.exposeInMainWorld("electron", {
         };
         electron.ipcRenderer.on("mcp-status-change", cb);
         return () => electron.ipcRenderer.off("mcp-status-change", cb);
-    }
+    },
+    // 浏览器 MCP 配置 API
+    updateBrowserConfig: (options: {
+        browserMode?: 'visible' | 'headless';
+        userDataDir?: string | null;
+        enablePersistence?: boolean;
+        persistBrowser?: boolean;
+    }) => ipcInvoke("mcp-update-browser-config", options),
+    getDefaultUserDataDir: () =>
+        ipcInvoke("mcp-get-default-user-data-dir"),
 } satisfies Window['electron'])
 
 function ipcInvoke<Key extends keyof EventPayloadMapping>(key: Key, ...args: any[]): Promise<EventPayloadMapping[Key]> {

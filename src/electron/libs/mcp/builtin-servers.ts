@@ -50,10 +50,12 @@ export function buildPlaywrightArgs(
  * 创建 Playwright MCP Server 配置
  * @param browserMode 浏览器运行模式
  * @param userDataDir 用户数据目录（留空则不持久化）
+ * @param persistBrowser 是否跨对话保持浏览器
  */
 export function createPlaywrightServerConfig(
     browserMode: MCPBrowserMode = "visible",
-    userDataDir?: string
+    userDataDir?: string,
+    persistBrowser: boolean = false
 ): MCPServerConfig {
     const now = new Date().toISOString();
 
@@ -69,6 +71,7 @@ export function createPlaywrightServerConfig(
         builtinType: "playwright",
         browserMode,
         userDataDir,
+        persistBrowser,
         createdAt: now,
         updatedAt: now,
     };
@@ -95,22 +98,30 @@ export function isBuiltinServer(serverId: string): boolean {
  * @param config 现有配置
  * @param browserMode 新的浏览器模式
  * @param userDataDir 新的用户数据目录（undefined 表示不修改，null 表示清除）
+ * @param persistBrowser 是否跨对话保持浏览器（undefined 表示不修改）
  */
 export function updatePlaywrightConfig(
     config: MCPServerConfig,
     browserMode: MCPBrowserMode,
-    userDataDir?: string | null
+    userDataDir?: string | null,
+    persistBrowser?: boolean
 ): MCPServerConfig {
     // 如果 userDataDir 是 undefined，保持原值；如果是 null，则清除
     const newUserDataDir = userDataDir === undefined
         ? config.userDataDir
         : (userDataDir ?? undefined);
 
+    // 如果 persistBrowser 是 undefined，保持原值
+    const newPersistBrowser = persistBrowser === undefined
+        ? config.persistBrowser
+        : persistBrowser;
+
     return {
         ...config,
         args: buildPlaywrightArgs(browserMode, newUserDataDir),
         browserMode,
         userDataDir: newUserDataDir,
+        persistBrowser: newPersistBrowser,
         updatedAt: new Date().toISOString(),
     };
 }
