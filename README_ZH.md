@@ -35,10 +35,6 @@ MiniMax-M2.1 是一款开源的 SOTA（当前最先进）模型，在编程能�
 [https://github.com/user-attachments/assets/694430fb-9d4b-452e-8429-d9c565082f43](https://github.com/user-attachments/assets/8ce58c8b-4024-4c01-82ee-f8d8ed6d4bba)
 
 
-## 入群交流
-![24](https://github.com/user-attachments/assets/c75070a0-2d22-4515-aaff-3909ab8f234d)
-
-
 ## 🚀 快速开始
 
 
