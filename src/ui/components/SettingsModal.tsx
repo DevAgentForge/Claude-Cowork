@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { APIConfigPanel } from "./APIConfigPanel";
 import { MCPToolsPanel } from "./MCPToolsPanel";
 import { AgentsPanel } from "./AgentsPanel";
@@ -11,7 +11,7 @@ interface SettingsModalProps {
 }
 
 /** Tab 配置 */
-const TABS: { id: SettingsTab; label: string; icon: JSX.Element }[] = [
+const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
   {
     id: "api",
     label: "API 配置",
